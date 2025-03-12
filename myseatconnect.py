@@ -15,6 +15,25 @@ def ola_request(endpoint):
     
 def extract_tokens(html): return{"_csrf":m.group(1)if(m:=re.search(r'(?:["\']csrf_token["\']|csrf_token)\s*:\s*["\']([^"\']+)["\']',html))else(_ for _ in()).throw(ValueError("No csrf_token")), "hmac":m.group(1)if(m:=re.search(r'(?:["\']hmac["\']|hmac)\s*:\s*["\']([^"\']+)["\']',html))else(_ for _ in()).throw(ValueError("No hmac")), "relayState":m.group(1)if(m:=re.search(r'(?:["\']relayState["\']|relayState)\s*:\s*["\']([^"\']+)["\']',html))else(_ for _ in()).throw(ValueError("No relayState"))}
 
+def request_jwt_token(location):
+    try:
+        response = session.get(location)
+    except InvalidSchema as exc:
+        match = re.search(r"No connection adapters were found for '(.*?)'",  str(exc))
+        if match:
+            seat_url = match.group(1)
+            code_list = parse_qs(urlparse(seat_url).query).get("code")
+            if code_list:
+                jwt_token = code_list[0]
+            else:
+                print("No 'code' parameter found in URL:", seat_url)
+                raise SystemExit
+        else:
+            print("No seat:// URL found in exception message.")
+            raise SystemExit
+
+    return jwt_token
+
 # Start session.
 session = requests.Session()
 
@@ -26,57 +45,25 @@ form = BeautifulSoup(response.text, "html.parser").find("form")
 if not form:
     raise RuntimeError("No form found in the response.")
 
-inputs = {tag.get("name"): tag.get("value") for tag in form.find_all("input", {"type": "hidden"})}
-
-required_fields = ["_csrf", "hmac", "relayState"]
-for field in required_fields:
-    if field not in inputs:
-        raise RuntimeError(f"Expected field '{field}' not found.")
+# Grag the tokens needed for the first login step.
+post = {tag.get("name"): tag.get("value") for tag in form.find_all("input", {"type": "hidden"})}
+post.update({"email": USERNAME})
 
 # Login (1)
-response = session.post(
-    IDENTITY_URL + form.get("action"),
-    data={
-        "_csrf": inputs["_csrf"],
-        "relayState": inputs["relayState"],
-        "hmac": inputs["hmac"],
-        "email": USERNAME,
-    },
-    allow_redirects=True
-)
+response = session.post(IDENTITY_URL + form.get("action"),data=post,allow_redirects=True)
 
+# Grab the tokens neeeded for the next login step.
 post = extract_tokens(response.text)
-post.update({
-    "email": USERNAME,
-    "password": PASSWORD,
-})
+post.update({"email": USERNAME,"password": PASSWORD})
 
 # Login (2)
 response = session.post(IDENTITY_URL + "/signin-service/v1/" + CLIENT_ID + "/login/authenticate",data=post,allow_redirects=False)
 
 # Grab the userId.
 userId = parse_qs(urlparse(response.headers.get('Location')).query)["userId"][0]
-print("userId=" + userId)
 
 # Grab the JWT token from location header containing seat://
-try:
-  response = session.get(response.headers.get('Location'))
-except InvalidSchema as exc:
-
-    exc_str = str(exc)
-    match = re.search(r"No connection adapters were found for '(.*?)'", exc_str)
-    if match:
-        seat_url = match.group(1)
-        parsed = urlparse(seat_url)
-        code_list = parse_qs(parsed.query).get("code")
-        if code_list:
-            jwt_token = code_list[0]
-        else:
-            print("No 'code' parameter found in URL:", seat_url)
-            raise SystemExit
-    else:
-        print("No seat:// URL found in exception message.")
-        raise SystemExit
+jwt_token = request_jwt_token(response.headers.get('Location'))
 
 print("\nGet vehicles")
 response = ola_request("/v2/users/" + userId +"/garage/vehicles")
