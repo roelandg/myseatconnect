@@ -4,41 +4,24 @@ from requests.exceptions import InvalidSchema
 from urllib.parse import urlparse, parse_qs
 from bs4 import BeautifulSoup
 
-identity_url = "https://identity.vwgroup.io"
-ola_url = "https://ola.prod.code.seat.cloud.vwgroup.com"
-client_id = "99a5b77d-bd88-4d53-b4e5-a539c60694a3%40apps_vw-dilab_com"
-username = ""
-password = ""
+IDENTITY_URL = "https://identity.vwgroup.io"
+OLA_URL = "https://ola.prod.code.seat.cloud.vwgroup.com"
+CLIENT_ID = "99a5b77d-bd88-4d53-b4e5-a539c60694a3%40apps_vw-dilab_com"
+USERNAME = ""
+PASSWORD = ""
 
 def ola_request(endpoint):
-    return requests.get(ola_url + endpoint, headers={'Authorization': 'Bearer ' + jwt_token})
+    return requests.get(OLA_URL + endpoint, headers={'Authorization': 'Bearer ' + jwt_token})
     
-def extract_tokens(html):
-    # Pattern handles either quoted or unquoted property names:
-    re_hmac = re.compile(r'(?:["\']hmac["\']|hmac)\s*:\s*["\']([^"\']+)["\']')
-    re_relayState = re.compile(r'(?:["\']relayState["\']|relayState)\s*:\s*["\']([^"\']+)["\']')
-    re_csrf_token = re.compile(r'(?:["\']csrf_token["\']|csrf_token)\s*:\s*["\']([^"\']+)["\']')
+def extract_tokens(html): return{"_csrf":m.group(1)if(m:=re.search(r'(?:["\']csrf_token["\']|csrf_token)\s*:\s*["\']([^"\']+)["\']',html))else(_ for _ in()).throw(ValueError("No csrf_token")), "hmac":m.group(1)if(m:=re.search(r'(?:["\']hmac["\']|hmac)\s*:\s*["\']([^"\']+)["\']',html))else(_ for _ in()).throw(ValueError("No hmac")), "relayState":m.group(1)if(m:=re.search(r'(?:["\']relayState["\']|relayState)\s*:\s*["\']([^"\']+)["\']',html))else(_ for _ in()).throw(ValueError("No relayState"))}
 
-    hmac_match       = re_hmac.search(html)
-    relayState_match = re_relayState.search(html)
-    csrf_token_match = re_csrf_token.search(html)
-
-    hmac_value       = hmac_match.group(1)       if hmac_match else None
-    relayState_value = relayState_match.group(1) if relayState_match else None
-    csrf_value       = csrf_token_match.group(1) if csrf_token_match else None
-
-    if not hmac_match:
-        raise ValueError("No hmac found in the HTML content.")
-    if not relayState_match:
-        raise ValueError("No relayState found in the HTML content.")
-    if not csrf_token_match:
-        raise ValueError("No csrf_token found in the HTML content.")
-    
-    return {"_csrf":csrf_value, "hmac": hmac_value, "relayState": relayState_value}
-
+# Start session.
 session = requests.Session()
-response = session.get(identity_url + "/oidc/v1/authorize?redirect_uri=seat%3A%2F%2Foauth-callback&client_id="+client_id+"&response_type=code&scope=openid%20profile%20nickname%20birthdate%20phone", allow_redirects=True)
 
+# Retrieve the login screen
+response = session.get(IDENTITY_URL + "/oidc/v1/authorize?redirect_uri=seat%3A%2F%2Foauth-callback&client_id="+CLIENT_ID+"&response_type=code&scope=openid%20profile%20nickname%20birthdate%20phone", allow_redirects=True)
+
+# Parse the html contents.
 form = BeautifulSoup(response.text, "html.parser").find("form")
 if not form:
     raise RuntimeError("No form found in the response.")
@@ -52,24 +35,24 @@ for field in required_fields:
 
 # Login (1)
 response = session.post(
-    identity_url + form.get("action"),
+    IDENTITY_URL + form.get("action"),
     data={
         "_csrf": inputs["_csrf"],
         "relayState": inputs["relayState"],
         "hmac": inputs["hmac"],
-        "email": username,
+        "email": USERNAME,
     },
     allow_redirects=True
 )
 
 post = extract_tokens(response.text)
 post.update({
-    "email": username,
-    "password": password,
+    "email": USERNAME,
+    "password": PASSWORD,
 })
 
 # Login (2)
-response = session.post(identity_url + "/signin-service/v1/" + client_id + "/login/authenticate",data=post,allow_redirects=False)
+response = session.post(IDENTITY_URL + "/signin-service/v1/" + CLIENT_ID + "/login/authenticate",data=post,allow_redirects=False)
 
 # Grab the userId.
 userId = parse_qs(urlparse(response.headers.get('Location')).query)["userId"][0]
