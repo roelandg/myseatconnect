@@ -7,8 +7,9 @@ from bs4 import BeautifulSoup
 IDENTITY_URL = "https://identity.vwgroup.io"
 OLA_URL = "https://ola.prod.code.seat.cloud.vwgroup.com"
 CLIENT_ID = "99a5b77d-bd88-4d53-b4e5-a539c60694a3%40apps_vw-dilab_com"
-USERNAME = ""
-PASSWORD = ""
+
+with open("config.json") as config_file:
+    config = json.load(config_file)
 
 def ola_request(endpoint):
     return requests.get(OLA_URL + endpoint, headers={'Authorization': 'Bearer ' + jwt_token})
@@ -47,14 +48,14 @@ if not form:
 
 # Grab the tokens needed for the first login step.
 post = {tag.get("name"): tag.get("value") for tag in form.find_all("input", {"type": "hidden"})}
-post.update({"email": USERNAME})
+post.update({"email": config['USERNAME']})
 
 # Login (1)
 response = session.post(IDENTITY_URL + form.get("action"),data=post,allow_redirects=True)
 
 # Grab the tokens neeeded for the next login step.
 post = extract_tokens(response.text)
-post.update({"email": USERNAME,"password": PASSWORD})
+post.update({"email": config['USERNAME'],"password": config['PASSWORD']})
 
 # Login (2)
 response = session.post(IDENTITY_URL + "/signin-service/v1/" + CLIENT_ID + "/login/authenticate",data=post,allow_redirects=False)
@@ -125,9 +126,7 @@ if len(sys.argv) == 4 and sys.argv[1] == "set":
             print(setKey + " successfully set to " + str(setValue))
 
 if len(sys.argv) == 3 and sys.argv[1] == "call":
-    callKey = sys.argv[2]
-
-    if callKey == "wakeup-request":
+    if sys.argv[2] == "wakeup-request":
         response = session.post(OLA_URL + "/v1/vehicles/" + vehicle['vin'] + "/vehicle-wakeup/request", headers={'Authorization': 'Bearer ' + jwt_token})
         if response.status_code == 201:
             print("successfully called wakeup-request")
