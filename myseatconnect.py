@@ -45,7 +45,7 @@ form = BeautifulSoup(response.text, "html.parser").find("form")
 if not form:
     raise RuntimeError("No form found in the response.")
 
-# Grag the tokens needed for the first login step.
+# Grab the tokens needed for the first login step.
 post = {tag.get("name"): tag.get("value") for tag in form.find_all("input", {"type": "hidden"})}
 post.update({"email": USERNAME})
 
