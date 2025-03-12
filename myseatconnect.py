@@ -1,4 +1,4 @@
-import requests, re,json
+import requests, re,json, sys
 import numpy as np
 from requests.exceptions import InvalidSchema
 from urllib.parse import urlparse, parse_qs
@@ -67,15 +67,18 @@ jwt_token = request_jwt_token(response.headers.get('Location'))
 
 print("\nGet vehicles")
 response = ola_request("/v2/users/" + userId +"/garage/vehicles")
-print(response.text)
 
-for vehicle in json.loads(response.text)['vehicles']:
+vehicle = json.loads(response.text)['vehicles'][0]
+
+if len(sys.argv) == 2 and sys.argv[1]=="get":
+    
+    print(vehicle)
     print("\nGet vehicle capabilities")
     print(json.loads(ola_request("/v1/user/" + userId + "/vehicle/" + vehicle['vin'] + "/capabilities").text))
 
     print("\nGet vehicle mycar")
     print(json.loads(ola_request("/v5/users/" + userId + "/vehicles/" + vehicle['vin'] + "/mycar").text))
-    
+
     print("\nGet vehicle status")
     print(json.loads(ola_request("/v2/vehicles/" + vehicle['vin'] + "/status").text))
 
@@ -84,30 +87,39 @@ for vehicle in json.loads(response.text)['vehicles']:
 
     print("\nGet vehicle renders") 
     print(json.loads(ola_request("/v1/vehicles/" + vehicle['vin'] + "/renders").text))
-    
+
     print("\nGet vehicle parkingposition") 
     print(json.loads(ola_request("/v1/vehicles/" + vehicle['vin'] + "/parkingposition").text))
-    
+
     print("\nGet vehicle mileage") 
     print(json.loads(ola_request("/v1/vehicles/" + vehicle['vin'] + "/mileage").text))
-    
+
     print("\nGet vehicle measurements/engines") 
     print(json.loads(ola_request("/v1/vehicles/" + vehicle['vin'] + "/measurements/engines").text))
-    
+
     print("\nGet vehicle warninglights") 
     print(json.loads(ola_request("/v3/vehicles/" + vehicle['vin'] + "/warninglights").text))
-    
+
     print("\nGet vehicle charging/info") 
     print(json.loads(ola_request("/v1/vehicles/" + vehicle['vin'] + "/charging/info").text))
-    
+
     print("\nGet vehicle climatisation/status") 
     print(json.loads(ola_request("/v1/vehicles/" + vehicle['vin'] + "/climatisation/status").text))
-    
+
     print("\nGet vehicle climatisation/settings") 
     print(json.loads(ola_request("/v2/vehicles/" + vehicle['vin'] + "/climatisation/settings").text))
-    
+
     print("\nGet vehicle charging/modes") 
     print(json.loads(ola_request("/v1/vehicles/" + vehicle['vin'] + "/charging/modes").text))
 
     print("\nGet vehicle departure-timers")
     print(json.loads(ola_request("/v1/vehicles/" + vehicle['vin'] + "/departure-timers").text))
+    
+if len(sys.argv) == 4 and sys.argv[1] == "set":
+    setKey = sys.argv[2]
+    setValue = int(sys.argv[3])
+
+    if setKey == "minSocPercentage":
+        response = session.post(OLA_URL + "/v1/vehicles/" + vehicle['vin'] + "/departure-timers/settings", json={setKey:setValue} , headers={'Authorization': 'Bearer ' + jwt_token})
+        if response.status_code == 201:
+            print(setKey + " successfully set to " + str(setValue))
