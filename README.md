@@ -20,11 +20,11 @@ git clone git@github.com:roelandg/myseatconnect.git
 
 ```shell
 # Get all info available (which is know so-far)
-python myseatconnect.py get 
+$ python myseatconnect.py get 
 
 # Set the  minimum charge level to 30%
-python myseatconnect.py set minSocPercentage 30
+$ python myseatconnect.py set minSocPercentage 30
 
 # Make a wake-up request
-python myseatconnect.py call wakeup-request
+$ python myseatconnect.py call wakeup-request
 ```
