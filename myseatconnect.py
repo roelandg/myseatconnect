@@ -123,3 +123,11 @@ if len(sys.argv) == 4 and sys.argv[1] == "set":
         response = session.post(OLA_URL + "/v1/vehicles/" + vehicle['vin'] + "/departure-timers/settings", json={setKey:setValue} , headers={'Authorization': 'Bearer ' + jwt_token})
         if response.status_code == 201:
             print(setKey + " successfully set to " + str(setValue))
+
+if len(sys.argv) == 3 and sys.argv[1] == "call":
+    callKey = sys.argv[2]
+
+    if callKey == "wakeup-request":
+        response = session.post(OLA_URL + "/v1/vehicles/" + vehicle['vin'] + "/vehicle-wakeup/request", headers={'Authorization': 'Bearer ' + jwt_token})
+        if response.status_code == 201:
+            print("successfully called wakeup-request")
